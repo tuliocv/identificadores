@@ -14,7 +14,7 @@ import streamlit as st
 # =========================
 st.set_page_config(page_title="Jogo de Identificadores", page_icon="🎮", layout="centered")
 st.title("🎮 Jogo: Classificação de Identificadores")
-st.caption("Aluno: digite seu nome para iniciar. Admin: login para ver ranking (com medalhas), top/bottom 10 e limpar respostas.")
+st.caption("Aluno: digite seu nome para iniciar.")
 
 
 # =========================
