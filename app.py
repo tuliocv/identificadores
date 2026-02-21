@@ -11,7 +11,7 @@ st.title("🎮 Jogo: Classificação de Identificadores")
 st.caption("Classifique o identificador. Se for ❌ inválido ou ⚠️ má prática, justifique marcando opções.")
 
 # =====================================================
-# REGRAS DIDÁTICAS (baseadas no seu material)
+# REGRAS DIDÁTICAS
 # =====================================================
 GENERICOS = {"a", "b", "c", "x", "y", "z", "n", "m", "i", "j", "k"}
 
@@ -39,7 +39,6 @@ def compute_gabarito(name: str) -> str:
     return "❌ Inválido"
 
 def expected_reasons(name: str) -> set[str]:
-    """Motivos esperados pelo sistema (para feedback/checagem)."""
     reasons = set()
     if not name:
         reasons.add("vazio")
@@ -57,7 +56,7 @@ def expected_reasons(name: str) -> set[str]:
     return reasons
 
 # =====================================================
-# 30 IDENTIFICADORES (mistura válido / inválido / má prática)
+# 30 IDENTIFICADORES
 # =====================================================
 IDENTIFICADORES = [
     "base", "altura", "_altura", "_altura1", "parede3lados",
@@ -71,7 +70,7 @@ IDENTIFICADORES = [
 ]
 
 # =====================================================
-# OPÇÕES DE JUSTIFICATIVA (lista fixa)
+# OPÇÕES DE JUSTIFICATIVA
 # =====================================================
 JUSTIFICATIVAS_INVALIDO = [
     "Começa com número",
@@ -89,24 +88,25 @@ JUSTIFICATIVAS_MA_PRATICA = [
 # =====================================================
 # ESTADO
 # =====================================================
-if "ordem" not in st.session_state:
-    st.session_state.ordem = IDENTIFICADORES[:]
-    random.shuffle(st.session_state.ordem)
-
-if "index" not in st.session_state:
+def reset_game():
+    ordem = IDENTIFICADORES[:]
+    random.shuffle(ordem)
+    st.session_state.ordem = ordem
     st.session_state.index = 0
     st.session_state.score = 0
+    st.session_state.show_feedback = False
+    st.session_state.last_answer_correct = None
+    st.session_state.last_gabarito = None
+    st.session_state.last_reasons = None
+    st.session_state.last_selected_ok = None
+
+if "ordem" not in st.session_state:
+    reset_game()
+
+if "show_feedback" not in st.session_state:
+    st.session_state.show_feedback = False
 
 total = len(st.session_state.ordem)
-
-# =====================================================
-# FUNÇÃO: reset
-# =====================================================
-def reset_game():
-    st.session_state.ordem = IDENTIFICADORES[:]
-    random.shuffle(st.session_state.ordem)
-    st.session_state.index = 0
-    st.session_state.score = 0
 
 # =====================================================
 # FIM DO JOGO
@@ -130,52 +130,80 @@ gabarito = compute_gabarito(ident)
 st.progress(st.session_state.index / total)
 st.subheader(f"Identificador: `{ident}`")
 
+# Enquanto estiver mostrando feedback, travamos inputs (para evitar mudar resposta depois)
+disabled_inputs = st.session_state.show_feedback
+
 resposta = st.radio(
     "Classifique:",
     ["✅ Válido", "❌ Inválido", "⚠️ Válido, mas má prática"],
-    index=0
+    index=0,
+    disabled=disabled_inputs,
 )
 
-# =====================================================
-# JUSTIFICATIVA (checkbox) - obrigatória conforme a escolha
-# =====================================================
 selecionadas = []
-
 if resposta == "❌ Inválido":
     st.markdown("**Justifique (marque ao menos 1 opção):**")
-    selecionadas = st.multiselect("Motivos:", JUSTIFICATIVAS_INVALIDO)
-
+    selecionadas = st.multiselect("Motivos:", JUSTIFICATIVAS_INVALIDO, disabled=disabled_inputs)
 elif resposta == "⚠️ Válido, mas má prática":
     st.markdown("**Justifique (marque ao menos 1 opção):**")
-    selecionadas = st.multiselect("Motivos:", JUSTIFICATIVAS_MA_PRATICA)
+    selecionadas = st.multiselect("Motivos:", JUSTIFICATIVAS_MA_PRATICA, disabled=disabled_inputs)
 
 # =====================================================
-# CONFIRMAR
+# CONFIRMAR (sem callback)
 # =====================================================
-if st.button("✅ Confirmar"):
-    # Regra: justificativa obrigatória para inválido/má prática
-    if resposta in ["❌ Inválido", "⚠️ Válido, mas má prática"] and len(selecionadas) == 0:
-        st.warning("⚠️ Você precisa justificar marcando ao menos 1 opção.")
-        st.stop()
+if not st.session_state.show_feedback:
+    if st.button("✅ Confirmar"):
+        # justificativa obrigatória
+        if resposta in ["❌ Inválido", "⚠️ Válido, mas má prática"] and len(selecionadas) == 0:
+            st.warning("⚠️ Você precisa justificar marcando ao menos 1 opção.")
+            st.stop()
 
-    # Pontuação: acertou classificação
-    if resposta == gabarito:
+        correto = (resposta == gabarito)
+        if correto:
+            st.session_state.score += 1
+
+        st.session_state.last_answer_correct = correto
+        st.session_state.last_gabarito = gabarito
+        st.session_state.last_reasons = expected_reasons(ident)
+
+        # (opcional) checar se justificativa bate com motivo esperado (apenas alerta)
+        last_selected_ok = True
+        if resposta == "❌ Inválido":
+            motivos = st.session_state.last_reasons
+            selected_keys = set()
+            for s in selecionadas:
+                if "número" in s:
+                    selected_keys.add("começa com número")
+                if "espaço" in s:
+                    selected_keys.add("tem espaço")
+                if "acento" in s:
+                    selected_keys.add("tem acento (não ASCII)")
+                if "símbolo" in s or "operador" in s:
+                    selected_keys.add("tem símbolo/operador inválido")
+            if len(selected_keys.intersection(motivos)) == 0:
+                last_selected_ok = False
+
+        st.session_state.last_selected_ok = last_selected_ok
+        st.session_state.show_feedback = True
+        st.rerun()
+
+# =====================================================
+# FEEDBACK (após confirmar)
+# =====================================================
+if st.session_state.show_feedback:
+    if st.session_state.last_answer_correct:
         st.success("✅ Correto!")
-        st.session_state.score += 1
     else:
-        st.error(f"❌ Incorreto. O correto era: **{gabarito}**")
+        st.error(f"❌ Incorreto. O correto era: **{st.session_state.last_gabarito}**")
 
-    # Feedback do sistema (regras)
     st.info("📌 Feedback pelas regras do sistema:")
-    motivos = expected_reasons(ident)
+    motivos = st.session_state.last_reasons
 
     if gabarito == "✅ Válido":
         st.write("- Identificador **válido** e **bem estruturado**.")
     elif gabarito == "⚠️ Válido, mas má prática":
         st.write("- Identificador **válido**, mas **má prática** (geralmente pouco descritivo).")
     else:
-        # mostrar quais regras foram violadas
-        # map simples para mostrar amigável
         mapa = {
             "começa com número": "Começa com número",
             "tem espaço": "Tem espaço",
@@ -186,25 +214,22 @@ if st.button("✅ Confirmar"):
             if key in motivos:
                 st.write(f"- {label}")
 
-    # (Opcional) checar se justificativa bate com o motivo esperado (sem penalizar)
-    if resposta == "❌ Inválido":
-        # converte seleção para "chaves" aproximadas
-        selected_keys = set()
-        for s in selecionadas:
-            if "número" in s:
-                selected_keys.add("começa com número")
-            if "espaço" in s:
-                selected_keys.add("tem espaço")
-            if "acento" in s:
-                selected_keys.add("tem acento (não ASCII)")
-            if "símbolo" in s or "operador" in s:
-                selected_keys.add("tem símbolo/operador inválido")
-
-        if len(selected_keys.intersection(motivos)) == 0:
-            st.warning("🟡 Sua justificativa não bateu com a regra violada (confira os motivos acima).")
+    if (gabarito == "❌ Inválido") and (st.session_state.last_selected_ok is False):
+        st.warning("🟡 Sua justificativa não bateu com a regra violada (confira os motivos acima).")
 
     st.divider()
 
-    # Avançar automaticamente
-    st.session_state.index += 1
-    st.button("➡️ Próximo", on_click=lambda: st.rerun())
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Pontuação", f"{st.session_state.score} / {total}")
+    with col2:
+        st.metric("Questão", f"{st.session_state.index + 1} / {total}")
+
+    if st.button("➡️ Próximo"):
+        st.session_state.index += 1
+        st.session_state.show_feedback = False
+        st.session_state.last_answer_correct = None
+        st.session_state.last_gabarito = None
+        st.session_state.last_reasons = None
+        st.session_state.last_selected_ok = None
+        st.rerun()
