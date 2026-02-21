@@ -440,7 +440,7 @@ else:
             top10 = best_sorted[:10]
             bottom10 = sorted(best_list, key=lambda x: (x["percent"], x["score"], x["timestamp_utc"]))[:10]
 
-            st.markdown("### 🧯 Bottom 10 (piores alunos)")
+            st.markdown("### 🧯 Bottom 10")
             bottom_table = []
             for i, r in enumerate(bottom10, start=1):
                 bottom_table.append({
