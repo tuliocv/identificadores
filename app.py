@@ -354,7 +354,7 @@ if view == "👤 Aluno":
 # ==========================================================
 else:
     st.subheader("🔐 Área do administrador")
-    st.caption("Login para visualizar ranking (com medalhas), top/bottom 10 e limpar respostas.")
+    st.caption("Login para visualizar ranking, top/bottom 10 e limpar respostas.")
 
     if not st.session_state.admin_authed:
         user = st.text_input("Usuário")
@@ -420,8 +420,8 @@ else:
             best_list = list(best_by_student.values())
             best_sorted = sorted(best_list, key=lambda x: (x["percent"], x["score"], x["timestamp_utc"]), reverse=True)
 
-            # Ranking com medalhas (top 10)
-            st.markdown("## 🏆 Ranking (Top 10) — com medalhas")
+            # Ranking top 10
+            st.markdown("## 🏆 Top 10")
 
             medals = {1: "🥇", 2: "🥈", 3: "🥉"}
             ranking_table = []
